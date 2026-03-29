@@ -581,7 +581,7 @@ async function doProofread(fid) {
       if(pt)pt.textContent=t.label+' 교정 중... ('+(i+1)+'/'+targets.length+')';
       const res=await fetch('/api/proofread',{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({text:text.slice(0,4000),level:proofLevel})
+        body:JSON.stringify({text:text.slice(0,1500),level:proofLevel})
       });
       if(!res.ok){const err=await res.json();throw new Error(err.error||'API 오류');}
       const data=await res.json();
