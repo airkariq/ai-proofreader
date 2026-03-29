@@ -1,7 +1,4 @@
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
-
-
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const LEVEL_PROMPT = {
   light: '맞춤법과 띄어쓰기만 교정하세요. 문장 구조는 절대 바꾸지 마세요.',
@@ -33,95 +30,77 @@ export async function POST(req) {
   try {
     const { text, level = 'normal' } = await req.json();
 
-    // 입력 검증
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      return Response.json(
-        { error: '교정할 텍스트가 없습니다.' },
-        { status: 400 }
-      );
+      return Response.json({ error: '교정할 텍스트가 없습니다.' }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      return Response.json(
-        { error: 'API 키가 설정되지 않았습니다.' },
-        { status: 500 }
-      );
+      return Response.json({ error: 'API 키가 설정되지 않았습니다.' }, { status: 500 });
     }
 
     const levelInstruction = LEVEL_PROMPT[level] || LEVEL_PROMPT.normal;
 
-    const prompt = `${SYSTEM_PROMPT}
-
-교정 강도: ${levelInstruction}
-
-교정할 텍스트:
-${text}`;
-
-    // Gemini API 호출
-    const geminiRes = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    const res = await fetch(OPENROUTER_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://ai-proofreader.vercel.app',
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,   // 낮을수록 일관된 교정
-          maxOutputTokens: 8192,
-        },
+        model: 'google/gemini-2.0-flash-exp:free',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user',   content: `교정 강도: ${levelInstruction}\n\n교정할 텍스트:\n${text}` }
+        ],
+        temperature: 0.2,
       }),
     });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error('Gemini API 오류:', errText);
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('OpenRouter 오류:', errText);
       return Response.json(
-        { error: 'Gemini API 호출 실패', detail: errText },
-        { status: geminiRes.status }
+        { error: 'OpenRouter API 호출 실패', detail: errText },
+        { status: res.status }
       );
     }
 
-    const geminiData = await geminiRes.json();
+    const data = await res.json();
+    const rawText = data?.choices?.[0]?.message?.content;
 
-    // 응답 텍스트 추출
-    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      return Response.json(
-        { error: 'Gemini 응답이 비어있습니다.' },
-        { status: 500 }
-      );
+      return Response.json({ error: '응답이 비어있습니다.' }, { status: 500 });
     }
 
-    // JSON 전처리: 마크다운 코드블록 제거
-    const cleaned = rawText
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim();
+    // JSON 전처리
+    const cleaned = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
 
-    // JSON 파싱
     let result;
     try {
       result = JSON.parse(cleaned);
-    } catch (e) {
+    } catch(e) {
       console.error('JSON 파싱 실패:', cleaned);
-      return Response.json(
-        { error: 'JSON 파싱 실패', raw: cleaned },
-        { status: 500 }
-      );
+      return Response.json({ error: 'JSON 파싱 실패', raw: cleaned }, { status: 500 });
     }
 
-    // 필수 필드 보정
     return Response.json({
       corrected: result.corrected ?? '',
       changes: Array.isArray(result.changes) ? result.changes : [],
       summary: result.summary ?? '',
     });
 
-  } catch (err) {
+  } catch(err) {
     console.error('서버 오류:', err);
-    return Response.json(
-      { error: '서버 오류가 발생했습니다.', detail: err.message },
-      { status: 500 }
-    );
+    return Response.json({ error: '서버 오류', detail: err.message }, { status: 500 });
   }
 }
+```
+
+---
+
+**Vercel 환경변수 변경**
+```
+기존: GEMINI_API_KEY  → 삭제 또는 유지 (무관)
+추가: OPENROUTER_API_KEY = 발급받은 키
