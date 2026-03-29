@@ -49,7 +49,7 @@ export async function POST(req) {
         'HTTP-Referer': 'https://ai-proofreader.vercel.app',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
+        model: 'openrouter/auto',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `교정 강도: ${levelInstruction}\n\n교정할 텍스트:\n${text}` }
