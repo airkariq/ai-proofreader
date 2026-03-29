@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 초벌 교정 시스템</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Space+Grotesk:wght@400;500;600&display=swap');
+  :root {
+    --bg:#f5f6fa;--surface:#fff;--surface2:#f0f1f7;--surface3:#e8eaf2;
+    --border:rgba(0,0,0,0.07);--border-accent:rgba(0,0,0,0.13);
+    --accent:#5b52e8;--accent2:#7c6ff7;--accent-glow:rgba(91,82,232,0.08);
+    --green:#16a34a;--amber:#d97706;--red:#dc2626;
+    --text:#1a1a2e;--text2:#555570;--text3:#9898b0;
+    --radius:12px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:14px;line-height:1.6;min-height:100vh;}
+  .app-shell{display:grid;grid-template-columns:260px 1fr;grid-template-rows:56px 1fr;height:100vh;overflow:hidden;}
+  /* TOPBAR */
+  .topbar{grid-column:1/-1;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:16px;z-index:10;}
+  .topbar-logo{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .logo-icon{width:28px;height:28px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+  .topbar-sep{flex:1;}
+  .topbar-meta{font-size:12px;color:var(--text3);}
+  /* SIDEBAR */
+  .sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+  .sidebar-section{padding:16px;border-bottom:1px solid var(--border);}
+  .sidebar-label{font-size:10px;font-weight:500;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:10px;}
+  .upload-zone{border:1.5px dashed var(--border-accent);border-radius:var(--radius);padding:20px 16px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;}
+  .upload-zone::before{content:'';position:absolute;inset:0;background:var(--accent-glow);opacity:0;transition:opacity 0.2s;}
+  .upload-zone:hover::before,.upload-zone.drag-over::before{opacity:1;}
+  .upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);}
+  .upload-icon{font-size:28px;margin-bottom:8px;display:block;}
+  .upload-text{font-size:12px;color:var(--text2);line-height:1.5;}
+  .upload-text strong{color:var(--accent2);}
+  #fileInput{display:none;}
+  .file-list{flex:1;overflow-y:auto;padding:8px;}
+  .file-list::-webkit-scrollbar{width:4px;}
+  .file-list::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px;}
+  .file-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius-sm);cursor:pointer;transition:background 0.15s;border:1px solid transparent;margin-bottom:4px;}
+  .file-item:hover{background:var(--surface2);}
+  .file-item.active{background:var(--accent-glow);border-color:rgba(91,82,232,0.3);}
+  .file-icon{width:32px;height:36px;background:var(--surface3);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent2);flex-shrink:0;}
+  .file-icon.done{color:var(--green);}
+  .file-info{flex:1;min-width:0;}
+  .file-name{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+  .file-meta{font-size:11px;color:var(--text3);margin-top:1px;}
+  .file-status{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .status-done{background:var(--green);}
+  .status-new{background:#c8c8d8;}
+  /* MAIN */
+  .main{display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+  .empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text3);text-align:center;padding:40px;}
+  .empty-icon{font-size:48px;opacity:0.4;}
+  .empty-title{font-size:16px;color:var(--text2);font-weight:500;}
+  .empty-sub{font-size:13px;max-width:280px;}
+  .detail-panel{display:none;flex-direction:column;height:100%;overflow:hidden;}
+  .detail-panel.visible{display:flex;}
+  .detail-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);background:var(--surface);}
+  .detail-title{font-size:15px;font-weight:700;word-break:break-all;}
+  .detail-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  /* TABS */
+  .tab-row{display:flex;gap:4px;padding:12px 24px 0;background:var(--surface);border-bottom:1px solid var(--border);}
+  .tab-btn{padding:8px 18px;font-size:13px;font-weight:500;font-family:'Noto Sans KR',sans-serif;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--text3);transition:all 0.15s;margin-bottom:-1px;}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .tab-btn:hover:not(.active){color:var(--text2);}
+  .tab-content{display:none;flex:1;overflow-y:auto;padding:20px 24px;}
+  .tab-content.visible{display:block;}
+  .tab-content::-webkit-scrollbar{width:4px;}
+  .tab-content::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px;}
+  /* BADGE */
+  .badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;}
+  .badge-purple{background:rgba(91,82,232,0.10);color:var(--accent);border:1px solid rgba(91,82,232,0.22);}
+  .badge-green{background:rgba(22,163,74,0.10);color:var(--green);border:1px solid rgba(22,163,74,0.25);}
+  .badge-amber{background:rgba(217,119,6,0.10);color:var(--amber);border:1px solid rgba(217,119,6,0.25);}
+  /* SECTION */
+  .section-title{font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--text3);margin-bottom:12px;}
+  .divider{height:1px;background:var(--border);margin:18px 0;}
+  /* SPLIT METHODS */
+  .split-method-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+  .method-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all 0.15s;text-align:left;}
+  .method-card:hover{border-color:var(--border-accent);background:var(--surface3);}
+  .method-card.selected{border-color:var(--accent);background:var(--accent-glow);}
+  .method-icon{font-size:18px;margin-bottom:6px;display:block;}
+  .method-name{font-size:13px;font-weight:600;color:var(--text);}
+  .method-desc{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4;}
+  /* FORM */
+  .form-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .form-label{font-size:13px;color:var(--text2);width:120px;flex-shrink:0;}
+  .form-input{flex:1;background:var(--surface2);border:1px solid var(--border-accent);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;transition:border-color 0.15s;}
+  .form-input:focus{border-color:var(--accent);}
+  .form-hint{font-size:11px;color:var(--text3);margin-top:-8px;margin-bottom:14px;padding-left:132px;}
+  .range-wrap{flex:1;display:flex;align-items:center;gap:10px;}
+  input[type=range]{flex:1;-webkit-appearance:none;height:4px;background:var(--surface3);border-radius:2px;outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;}
+  .range-value{font-size:12px;color:var(--accent2);font-weight:600;min-width:36px;text-align:right;}
+  /* TABLE */
+  .preview-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px;}
+  .preview-table{width:100%;border-collapse:collapse;}
+  .preview-table th{padding:10px 14px;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--text3);background:var(--surface2);text-align:left;border-bottom:1px solid var(--border);}
+  .preview-table td{padding:9px 14px;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border);}
+  .preview-table tr:last-child td{border-bottom:none;}
+  .preview-table tr:hover td{background:var(--surface2);}
+  .chunk-num{font-family:'Space Grotesk',monospace;font-weight:600;color:var(--accent2);}
+  /* PROGRESS */
+  .progress-bar-wrap{background:var(--surface3);border-radius:4px;height:6px;overflow:hidden;margin:8px 0;}
+  .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width 0.3s ease;}
+  .progress-text{font-size:11px;color:var(--text3);text-align:center;margin-top:6px;}
+  /* LEVEL */
+  .level-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;}
+  .level-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;cursor:pointer;transition:all 0.15s;text-align:center;}
+  .level-card:hover{border-color:var(--border-accent);}
+  .level-card.selected{border-color:var(--accent);background:var(--accent-glow);}
+  .level-icon{font-size:20px;margin-bottom:4px;display:block;}
+  .level-name{font-size:12px;font-weight:600;color:var(--text);}
+  .level-desc{font-size:10px;color:var(--text3);margin-top:2px;}
+  /* DIFF */
+  .diff-container{display:flex;flex-direction:column;gap:16px;}
+  .diff-chunk{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .diff-chunk-header{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text2);}
+  .diff-body{display:grid;grid-template-columns:1fr 1fr;}
+  .diff-side{padding:14px 16px;font-size:13px;line-height:1.8;word-break:break-all;}
+  .diff-side-label{font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;}
+  .diff-original{border-right:1px solid var(--border);}
+  mark.del{background:rgba(220,38,38,0.12);color:var(--red);border-radius:3px;padding:0 2px;text-decoration:line-through;}
+  mark.ins{background:rgba(22,163,74,0.12);color:var(--green);border-radius:3px;padding:0 2px;}
+  /* CHANGES TABLE */
+  .changes-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .changes-table th{padding:8px 12px;background:var(--surface2);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;text-align:left;border-bottom:1px solid var(--border);}
+  .changes-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  .changes-table tr:last-child td{border-bottom:none;}
+  .tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600;}
+  .tag-spell{background:rgba(220,38,38,0.1);color:var(--red);}
+  .tag-space{background:rgba(217,119,6,0.1);color:var(--amber);}
+  .tag-sent{background:rgba(91,82,232,0.1);color:var(--accent);}
+  /* SUMMARY */
+  .summary-box{background:rgba(91,82,232,0.06);border:1px solid rgba(91,82,232,0.18);border-radius:var(--radius);padding:14px 16px;margin-bottom:20px;font-size:13px;color:var(--text2);}
+  .summary-box strong{color:var(--accent);}
+  /* WARNING */
+  .size-warning{background:rgba(217,119,6,0.06);border:1px solid rgba(217,119,6,0.22);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:12px;color:#92530a;display:flex;gap:10px;align-items:flex-start;}
+  /* ACTION ROW */
+  .action-row{display:flex;gap:10px;padding:16px 24px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+  .btn{padding:9px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;font-family:'Noto Sans KR',sans-serif;cursor:pointer;border:none;transition:all 0.15s;display:flex;align-items:center;gap:6px;}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:not(:disabled):hover{background:#6c63ff;}
+  .btn-secondary{background:var(--surface3);color:var(--text);border:1px solid var(--border-accent);}
+  .btn-secondary:not(:disabled):hover{background:var(--surface2);}
+  .btn-danger{background:rgba(220,38,38,0.07);color:var(--red);border:1px solid rgba(220,38,38,0.22);}
+  .btn-danger:not(:disabled):hover{background:rgba(220,38,38,0.14);}
+  /* TOAST */
+  .toast-container{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:1000;}
+  .toast{background:#fff;border:1px solid var(--border-accent);border-radius:var(--radius);padding:12px 16px;font-size:13px;color:var(--text);box-shadow:0 4px 20px rgba(0,0,0,0.12);max-width:300px;display:flex;align-items:center;gap:8px;animation:slideIn 0.2s ease;}
+  .toast.success{border-color:rgba(22,163,74,0.4);}
+  .toast.error{border-color:rgba(220,38,38,0.35);}
+  @keyframes slideIn{from{transform:translateX(20px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar-logo">
+      <div class="logo-icon">✦</div>
+      AI 초벌 교정
+    </div>
+    <div class="topbar-sep"></div>
+    <span class="topbar-meta" id="topbarMeta">PDF 파일을 업로드하여 시작하세요</span>
+  </header>
+
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">파일 업로드</div>
+      <div class="upload-zone" id="uploadZone">
+        <span class="upload-icon">📄</span>
+        <div class="upload-text">
+          <strong>클릭</strong>하거나<br>파일을 드래그하세요<br>
+          <span style="font-size:11px;margin-top:4px;display:block;">PDF · 최대 500MB</span>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept=".pdf" multiple>
+    </div>
+    <div class="sidebar-section" style="padding-bottom:8px;">
+      <div class="sidebar-label">파일 목록 (<span id="fileCount">0</span>)</div>
+    </div>
+    <div class="file-list" id="fileList">
+      <div style="padding:20px;text-align:center;color:var(--text3);font-size:12px;">업로드된 파일이 없습니다</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🗂️</div>
+      <div class="empty-title">파일을 선택하세요</div>
+      <div class="empty-sub">왼쪽 사이드바에서 PDF 파일을 업로드하거나 목록에서 파일을 선택하세요</div>
+    </div>
+
+    <div class="detail-panel" id="detailPanel">
+      <div class="detail-header">
+        <div class="detail-title" id="detailName">—</div>
+        <div class="detail-badges" id="detailBadges"></div>
+      </div>
+      <div class="tab-row">
+        <button class="tab-btn active" id="tab-split"     onclick="switchTab('split')">✂️ 분할</button>
+        <button class="tab-btn"        id="tab-proofread" onclick="switchTab('proofread')">✍️ 교정</button>
+        <button class="tab-btn"        id="tab-result"    onclick="switchTab('result')">📋 결과</button>
+      </div>
+      <div class="tab-content visible" id="content-split"></div>
+      <div class="tab-content"         id="content-proofread"></div>
+      <div class="tab-content"         id="content-result">
+        <div style="color:var(--text3);font-size:13px;padding:20px 0;">교정을 실행하면 결과가 여기에 표시됩니다</div>
+      </div>
+      <div class="action-row" id="actionRow"></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- CDN -->
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://unpkg.com/downloadjs@1.4.7/download.min.js"></script>
+
+<script>
+// ── STATE ──
+const files = [];
+let activeId = null, splitMethod = 'pages', proofLevel = 'normal';
+
+// ── UTILS ──
+function fmtSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+function uid() { return Math.random().toString(36).slice(2,9); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function toast(msg, type='info') {
+  const icons = {info:'ℹ️',success:'✅',error:'❌',warning:'⚠️'};
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = '<span>'+(icons[type]||'ℹ️')+'</span><span>'+esc(msg)+'</span>';
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── UPLOAD ──
+const uploadZone = document.getElementById('uploadZone');
+const fileInput  = document.getElementById('fileInput');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+uploadZone.addEventListener('dragover',  e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  handleFiles(e.dataTransfer.files);
+});
+
+async function handleFiles(list) {
+  for (const f of list) {
+    if (!f.name.toLowerCase().endsWith('.pdf')) { toast(f.name + ': PDF만 지원합니다', 'warning'); continue; }
+    await loadPDF(f);
+  }
+}
+
+async function loadPDF(f) {
+  try {
+    const ab = await f.arrayBuffer();
+    const doc = await PDFLib.PDFDocument.load(ab, { ignoreEncryption: true });
+    const pageCount = doc.getPageCount();
+    const entry = { id:uid(), name:f.name, size:f.size, pageCount, arrayBuffer:ab, chunks:[], proofResults:[] };
+    files.push(entry);
+    renderFileList();
+    selectFile(entry.id);
+    updateTopbarMeta();
+    toast(f.name + ' 로드 완료 (' + pageCount + '페이지)', 'success');
+  } catch(e) {
+    toast(f.name + ': 읽기 실패 — ' + e.message, 'error');
+  }
+}
+
+// ── SIDEBAR ──
+function renderFileList() {
+  const list = document.getElementById('fileList');
+  document.getElementById('fileCount').textContent = files.length;
+  if (!files.length) { list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:12px;">업로드된 파일이 없습니다</div>'; return; }
+  list.innerHTML = files.map(f => {
+    const done = f.proofResults.length > 0;
+    return '<div class="file-item '+(f.id===activeId?'active':'')+'" onclick="selectFile(\''+f.id+'\')">'
+      +'<div class="file-icon '+(done?'done':'')+'">PDF</div>'
+      +'<div class="file-info"><div class="file-name">'+esc(f.name)+'</div>'
+      +'<div class="file-meta">'+f.pageCount+'p · '+fmtSize(f.size)+(done?' · 교정완료':'')+'</div></div>'
+      +'<div class="file-status '+(done?'status-done':'status-new')+'"></div></div>';
+  }).join('');
+}
+
+// ── DETAIL ──
+function selectFile(id) {
+  activeId = id; renderFileList();
+  const f = files.find(x => x.id === id); if (!f) return;
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('detailPanel').classList.add('visible');
+  document.getElementById('detailName').textContent = f.name;
+  const large = f.size > 10*1024*1024;
+  document.getElementById('detailBadges').innerHTML =
+    '<span class="badge badge-purple">'+f.pageCount+' 페이지</span>'
+    +'<span class="badge badge-purple">'+fmtSize(f.size)+'</span>'
+    +(large?'<span class="badge badge-amber">대용량</span>':'')
+    +(f.proofResults.length?'<span class="badge badge-green">교정완료</span>':'');
+  renderSplitTab(f); renderProofreadTab(f);
+  if (f.proofResults.length) renderResultTab(f);
+  switchTab('split');
+}
+
+// ── TABS ──
+function switchTab(name) {
+  ['split','proofread','result'].forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('active', t===name);
+    document.getElementById('content-'+t).classList.toggle('visible', t===name);
+  });
+  const f = files.find(x => x.id === activeId);
+  renderActionRow(f, name);
+}
+
+// ── TAB: 분할 ──
+function renderSplitTab(f) {
+  const large = f.size > 10*1024*1024;
+  const methods = [
+    {id:'pages',icon:'📃',name:'페이지 수',desc:'N페이지씩 균등 분할'},
+    {id:'size', icon:'⚖️',name:'파일 크기',desc:'MB 단위로 분할'},
+    {id:'range',icon:'🎯',name:'범위 지정',desc:'직접 페이지 범위 입력'},
+    {id:'all',  icon:'📑',name:'1페이지씩',desc:'모든 페이지 개별 분리'},
+  ];
+  document.getElementById('content-split').innerHTML =
+    (large?'<div class="size-warning"><span>⚠️</span><span>파일 용량이 큽니다 ('+fmtSize(f.size)+'). 분할을 권장합니다.</span></div>':'')
+    +'<div class="section-title">분할 방식</div>'
+    +'<div class="split-method-grid">'
+    +methods.map(m=>'<div class="method-card '+(splitMethod===m.id?'selected':'')+'" onclick="setSplitMethod(\''+m.id+'\',\''+f.id+'\')">'
+      +'<span class="method-icon">'+m.icon+'</span><div class="method-name">'+m.name+'</div><div class="method-desc">'+m.desc+'</div></div>').join('')
+    +'</div><div id="splitOptions"></div>'
+    +'<div class="divider"></div><div class="section-title">분할 미리보기</div>'
+    +'<div id="splitPreview"><div style="color:var(--text3);font-size:12px;padding:8px 0;">분할 옵션을 설정하면 미리보기가 표시됩니다</div></div>'
+    +'<div class="divider"></div>'
+    +'<div id="progressSection" style="display:none;">'
+      +'<div class="section-title">진행 상황</div>'
+      +'<div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>'
+      +'<div class="progress-text" id="progressText">준비 중...</div>'
+    +'</div>';
+  renderSplitOptions(f);
+}
+
+function setSplitMethod(m, fid) {
+  splitMethod = m;
+  const f = files.find(x => x.id===fid); if (f) renderSplitTab(f);
+}
+
+function renderSplitOptions(f) {
+  const el = document.getElementById('splitOptions'); if (!el) return;
+  if (splitMethod==='pages') {
+    const rec = Math.max(1, Math.min(30, Math.ceil(f.pageCount/5)));
+    el.innerHTML = '<div class="form-row"><span class="form-label">분할 단위 (페이지)</span>'
+      +'<div class="range-wrap"><input type="range" id="splitPages" min="1" max="'+f.pageCount+'" value="'+rec
+      +'" oninput="document.getElementById(\'splitPagesVal\').textContent=this.value;updatePreview(\''+f.id+'\')">'
+      +'<span class="range-value" id="splitPagesVal">'+rec+'</span></div></div>';
+    setTimeout(()=>updatePreview(f.id),0);
+  } else if (splitMethod==='size') {
+    const rec = Math.max(1,Math.round(f.size/f.pageCount/1048576*10));
+    el.innerHTML = '<div class="form-row"><span class="form-label">최대 크기 (MB)</span>'
+      +'<input type="number" class="form-input" id="splitSize" min="0.5" max="500" step="0.5" value="'+(rec||5)
+      +'" oninput="updatePreview(\''+f.id+'\')"></div>'
+      +'<div class="form-hint">파일 크기는 추정값입니다</div>';
+    setTimeout(()=>updatePreview(f.id),0);
+  } else if (splitMethod==='range') {
+    el.innerHTML = '<div class="form-row"><span class="form-label">페이지 범위</span>'
+      +'<input type="text" class="form-input" id="splitRange" placeholder="예: 1-10, 11-25, 26-'+f.pageCount
+      +'" oninput="updatePreview(\''+f.id+'\')"></div>'
+      +'<div class="form-hint">쉼표로 구분, 총 '+f.pageCount+'페이지</div>';
+  } else {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:4px 0 12px;">'+f.pageCount+'개의 파일로 분리됩니다</div>';
+    setTimeout(()=>updatePreview(f.id),0);
+  }
+}
+
+function computeChunks(f) {
+  const chunks=[], total=f.pageCount;
+  if (splitMethod==='pages') {
+    const n=parseInt(document.getElementById('splitPages')?.value||10);
+    for(let s=1;s<=total;s+=n){const e=Math.min(s+n-1,total);chunks.push({label:'파트'+(chunks.length+1),pages:s+'–'+e,count:e-s+1,size:Math.round(f.size*(e-s+1)/total),start:s,end:e});}
+  } else if (splitMethod==='size') {
+    const mb=parseFloat(document.getElementById('splitSize')?.value||5);
+    const ppc=Math.max(1,Math.floor(mb*1048576*total/f.size));
+    for(let s=1;s<=total;s+=ppc){const e=Math.min(s+ppc-1,total);chunks.push({label:'파트'+(chunks.length+1),pages:s+'–'+e,count:e-s+1,size:Math.round(f.size*(e-s+1)/total),start:s,end:e});}
+  } else if (splitMethod==='range') {
+    for(const p of (document.getElementById('splitRange')?.value||'').split(',').map(r=>r.trim()).filter(Boolean)){
+      const m=p.match(/^(\d+)-(\d+)$/);if(!m)continue;
+      const s=+m[1],e=+m[2];if(s<1||e>total||s>e)continue;
+      chunks.push({label:'파트'+(chunks.length+1),pages:s+'–'+e,count:e-s+1,size:Math.round(f.size*(e-s+1)/total),start:s,end:e});
+    }
+  } else {
+    for(let i=1;i<=total;i++)chunks.push({label:'페이지'+i,pages:''+i,count:1,size:Math.round(f.size/total),start:i,end:i});
+  }
+  return chunks;
+}
+
+function updatePreview(fid) {
+  const f=files.find(x=>x.id===fid); if(!f)return;
+  const chunks=computeChunks(f);
+  const preview=document.getElementById('splitPreview'); if(!preview)return;
+  if(!chunks.length){preview.innerHTML='<div style="color:var(--text3);font-size:12px;padding:8px 0;">유효한 분할 설정을 입력하세요</div>';return;}
+  const show=(splitMethod==='all'&&chunks.length>8)?chunks.slice(0,8):chunks;
+  const more=chunks.length-show.length;
+  preview.innerHTML='<div class="preview-box"><table class="preview-table">'
+    +'<thead><tr><th>#</th><th>이름</th><th>범위</th><th>페이지</th><th>크기</th></tr></thead><tbody>'
+    +show.map((c,i)=>'<tr><td class="chunk-num">'+(i+1)+'</td><td>'+c.label+'</td><td>'+c.pages+'</td><td>'+c.count+'p</td><td>'+fmtSize(c.size)+'</td></tr>').join('')
+    +(more>0?'<tr><td colspan="5" style="text-align:center;color:var(--text3);">...외 '+more+'개</td></tr>':'')
+    +'</tbody></table></div>'
+    +'<div style="font-size:12px;color:var(--text2);">총 <strong style="color:var(--accent2);">'+chunks.length+'개</strong> 청크로 분할됩니다</div>';
+}
+
+// ── TAB: 교정 ──
+function renderProofreadTab(f) {
+  const levels=[
+    {id:'light',icon:'🔍',name:'가볍게',desc:'맞춤법·띄어쓰기만'},
+    {id:'normal',icon:'✏️',name:'보통',desc:'어색한 표현 포함'},
+    {id:'deep',icon:'🔬',name:'꼼꼼히',desc:'논리 흐름까지'},
+  ];
+  document.getElementById('content-proofread').innerHTML =
+    '<div class="section-title">교정 강도</div>'
+    +'<div class="level-grid">'
+    +levels.map(lv=>'<div class="level-card '+(proofLevel===lv.id?'selected':'')+'" onclick="setProofLevel(\''+lv.id+'\')">'
+      +'<span class="level-icon">'+lv.icon+'</span><div class="level-name">'+lv.name+'</div><div class="level-desc">'+lv.desc+'</div></div>').join('')
+    +'</div><div class="divider"></div>'
+    +'<div class="section-title">교정 대상</div>'
+    +'<div style="font-size:13px;color:var(--text2);margin-bottom:12px;">분할된 청크 단위로 순차 교정합니다. 분할하지 않은 경우 전체를 한 번에 교정합니다.</div>'
+    +'<div id="proofProgressSection" style="display:none;">'
+      +'<div class="divider"></div><div class="section-title">교정 진행 상황</div>'
+      +'<div class="progress-bar-wrap"><div class="progress-bar-fill" id="proofProgressFill" style="width:0%"></div></div>'
+      +'<div class="progress-text" id="proofProgressText">준비 중...</div>'
+    +'</div>';
+}
+
+function setProofLevel(lv) {
+  proofLevel = lv;
+  const f=files.find(x=>x.id===activeId); if(f) renderProofreadTab(f);
+}
+
+// ── TAB: 결과 ──
+function renderResultTab(f) {
+  const el=document.getElementById('content-result');
+  if(!f.proofResults.length){el.innerHTML='<div style="color:var(--text3);font-size:13px;padding:20px 0;">교정을 실행하면 결과가 여기에 표시됩니다</div>';return;}
+  const allChanges=f.proofResults.flatMap(r=>r.changes||[]);
+  const summaries=f.proofResults.map(r=>r.summary).filter(Boolean);
+  let html='';
+  if(summaries.length) html+='<div class="summary-box"><strong>📝 교정 요약</strong><br>'+summaries.map(esc).join(' / ')+'</div>';
+  if(allChanges.length) {
+    html+='<div class="section-title" style="margin-bottom:10px;">변경 사항 ('+allChanges.length+'건)</div>'
+      +'<div class="preview-box" style="margin-bottom:20px;"><table class="changes-table">'
+      +'<thead><tr><th>원문</th><th>교정</th><th>이유</th><th>유형</th></tr></thead><tbody>'
+      +allChanges.map(c=>{const tc=c.type==='맞춤법'?'tag-spell':c.type==='띄어쓰기'?'tag-space':'tag-sent';
+        return '<tr><td><mark class="del">'+esc(c.before||'')+'</mark></td>'
+          +'<td><mark class="ins">'+esc(c.after||'')+'</mark></td>'
+          +'<td style="color:var(--text2)">'+esc(c.reason||'')+'</td>'
+          +'<td><span class="tag '+tc+'">'+esc(c.type||'기타')+'</span></td></tr>';
+      }).join('')+'</tbody></table></div>';
+  }
+  html+='<div class="section-title">원문 / 교정문 비교</div><div class="diff-container">';
+  f.proofResults.forEach((r,i)=>{
+    html+='<div class="diff-chunk">'
+      +'<div class="diff-chunk-header">📄 파트 '+(i+1)+' <span style="font-weight:400;color:var(--text3)">('+( r.changes?.length||0)+'건 교정)</span></div>'
+      +'<div class="diff-body">'
+        +'<div class="diff-side diff-original"><div class="diff-side-label">원문</div>'+diffText(r.original,r.changes,'before')+'</div>'
+        +'<div class="diff-side diff-corrected"><div class="diff-side-label">교정문</div>'+diffText(r.corrected,r.changes,'after')+'</div>'
+      +'</div></div>';
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function diffText(text,changes,side){
+  if(!text)return '<span style="color:var(--text3)">—</span>';
+  let r=esc(text);
+  (changes||[]).forEach(c=>{
+    const w=esc(side==='before'?c.before:c.after);
+    if(!w)return;
+    r=r.replace(w,'<mark class="'+(side==='before'?'del':'ins')+'">'+w+'</mark>');
+  });
+  return r;
+}
+
+// ── ACTION ROW ──
+function renderActionRow(f, tab) {
+  const row=document.getElementById('actionRow'); if(!row||!f)return;
+  const t=tab||(document.querySelector('.tab-btn.active')?.id?.replace('tab-','')||'split');
+  if(t==='split'){
+    row.innerHTML='<button class="btn btn-primary" id="btnSplit" onclick="doSplit(\''+f.id+'\')">✂️ 분할 실행</button>'
+      +(f.chunks.length?'<button class="btn btn-secondary" onclick="doDownloadAll(\''+f.id+'\')">⬇️ 전체 다운로드</button>':'')
+      +'<span style="flex:1"></span>'
+      +'<button class="btn btn-danger" onclick="removeFile(\''+f.id+'\')">🗑️ 제거</button>';
+  } else if(t==='proofread'){
+    row.innerHTML='<button class="btn btn-primary" id="btnProof" onclick="doProofread(\''+f.id+'\')">✍️ 교정 실행</button>'
+      +(f.proofResults.length?'<button class="btn btn-secondary" onclick="switchTab(\'result\')">📋 결과 보기</button>':'')
+      +'<span style="flex:1"></span>'
+      +'<button class="btn btn-danger" onclick="removeFile(\''+f.id+'\')">🗑️ 제거</button>';
+  } else {
+    row.innerHTML='<button class="btn btn-secondary" onclick="downloadResult(\''+f.id+'\')">⬇️ 결과 다운로드</button>'
+      +'<span style="flex:1"></span>'
+      +'<button class="btn btn-danger" onclick="removeFile(\''+f.id+'\')">🗑️ 제거</button>';
+  }
+}
+
+// ── SPLIT ──
+async function doSplit(fid) {
+  const f=files.find(x=>x.id===fid); if(!f)return;
+  const chunks=computeChunks(f);
+  if(!chunks.length){toast('분할 설정을 확인하세요','warning');return;}
+  const ps=document.getElementById('progressSection');
+  const pf=document.getElementById('progressFill');
+  const pt=document.getElementById('progressText');
+  if(ps)ps.style.display='block';
+  const btn=document.getElementById('btnSplit'); if(btn)btn.disabled=true;
+  try{
+    const srcDoc=await PDFLib.PDFDocument.load(f.arrayBuffer,{ignoreEncryption:true});
+    const results=[];
+    for(let i=0;i<chunks.length;i++){
+      const c=chunks[i];
+      const newDoc=await PDFLib.PDFDocument.create();
+      const pageIdxs=Array.from({length:c.end-c.start+1},(_,k)=>c.start-1+k);
+      const copied=await newDoc.copyPages(srcDoc,pageIdxs);
+      copied.forEach(p=>newDoc.addPage(p));
+      const bytes=await newDoc.save();
+      results.push({name:f.name.replace(/\.pdf$/i,'')+'_파트'+(i+1)+'.pdf',bytes,start:c.start,end:c.end});
+      const pct=Math.round((i+1)/chunks.length*100);
+      if(pf)pf.style.width=pct+'%';
+      if(pt)pt.textContent=(i+1)+'/'+chunks.length+' 처리 중... ('+pct+'%)';
+      await new Promise(r=>setTimeout(r,0));
+    }
+    f.chunks=results; renderFileList(); selectFile(fid);
+    if(pt)pt.textContent='✅ 분할 완료 — '+results.length+'개 파일';
+    toast('분할 완료: '+results.length+'개 파일','success');
+  }catch(e){ toast('분할 오류: '+e.message,'error'); }
+  const btn2=document.getElementById('btnSplit'); if(btn2)btn2.disabled=false;
+}
+
+async function doDownloadAll(fid) {
+  const f=files.find(x=>x.id===fid); if(!f||!f.chunks.length)return;
+  for(const c of f.chunks){
+    download(new Blob([c.bytes],{type:'application/pdf'}), c.name,'application/pdf');
+    await new Promise(r=>setTimeout(r,300));
+  }
+  toast(f.chunks.length+'개 파일 다운로드 완료','success');
+}
+
+// ── PROOFREAD ──
+async function doProofread(fid) {
+  const f=files.find(x=>x.id===fid); if(!f)return;
+  const btn=document.getElementById('btnProof'); if(btn)btn.disabled=true;
+  const ps=document.getElementById('proofProgressSection');
+  const pf=document.getElementById('proofProgressFill');
+  const pt=document.getElementById('proofProgressText');
+  if(ps)ps.style.display='block';
+  const targets=f.chunks.length
+    ? f.chunks.map((c,i)=>({label:'파트'+(i+1),buffer:c.bytes}))
+    : [{label:'전체',buffer:f.arrayBuffer}];
+  f.proofResults=[];
+  try{
+    for(let i=0;i<targets.length;i++){
+      const t=targets[i];
+      if(pt)pt.textContent=t.label+' 텍스트 추출 중...';
+      const text=await extractText(t.buffer);
+      if(!text.trim()||text.startsWith('(')){
+        f.proofResults.push({original:text,corrected:'(텍스트 추출 불가)',changes:[],summary:t.label+': 텍스트 레이어 없음'});
+        continue;
+      }
+      if(pt)pt.textContent=t.label+' 교정 중... ('+(i+1)+'/'+targets.length+')';
+      const res=await fetch('/api/proofread',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({text:text.slice(0,4000),level:proofLevel})
+      });
+      if(!res.ok){const err=await res.json();throw new Error(err.error||'API 오류');}
+      const data=await res.json();
+      f.proofResults.push({original:text.slice(0,4000),...data});
+      const pct=Math.round((i+1)/targets.length*100);
+      if(pf)pf.style.width=pct+'%';
+      if(pt)pt.textContent=(i+1)+'/'+targets.length+' 완료 ('+pct+'%)';
+      await new Promise(r=>setTimeout(r,300));
+    }
+    renderFileList(); renderResultTab(f); selectFile(fid); switchTab('result');
+    toast('교정 완료!','success');
+  }catch(e){
+    toast('교정 오류: '+e.message,'error');
+    if(pt)pt.textContent='❌ 오류: '+e.message;
+  }
+  const btn2=document.getElementById('btnProof'); if(btn2)btn2.disabled=false;
+}
+
+async function extractText(buffer) {
+  try{
+    const ab=buffer instanceof ArrayBuffer?buffer:await new Response(buffer).arrayBuffer();
+    const raw=new TextDecoder('latin1').decode(new Uint8Array(ab));
+    let text='';
+    for(const block of (raw.match(/BT([\s\S]*?)ET/g)||[])){
+      for(const tj of (block.match(/\(([^)]*)\)\s*Tj/g)||[])){const m=tj.match(/\(([^)]*)\)/);if(m)text+=m[1]+' ';}
+      for(const tf of (block.match(/\[([^\]]*)\]\s*TJ/g)||[])){
+        const inner=tf.match(/\[([^\]]*)\]/)[1];
+        for(const s of (inner.match(/\(([^)]*)\)/g)||[]))text+=s.slice(1,-1)+' ';
+      }
+    }
+    return text.trim()||'(텍스트 레이어 없음 — 스캔 PDF일 수 있습니다)';
+  }catch(e){return '(텍스트 추출 실패: '+e.message+')';}
+}
+
+function downloadResult(fid) {
+  const f=files.find(x=>x.id===fid); if(!f||!f.proofResults.length)return;
+  let c='AI 초벌 교정 결과\n파일: '+f.name+'\n날짜: '+new Date().toLocaleString('ko-KR')+'\n'+'='.repeat(50)+'\n\n';
+  f.proofResults.forEach((r,i)=>{
+    c+='[ 파트 '+(i+1)+' ]\n요약: '+(r.summary||'')+'\n\n교정문:\n'+(r.corrected||'')+'\n\n';
+    if(r.changes?.length){c+='변경 사항:\n';r.changes.forEach(ch=>{c+='  · '+ch.before+' → '+ch.after+' ('+ch.reason+')\n';});}
+    c+='\n'+'-'.repeat(40)+'\n\n';
+  });
+  download(new Blob([c],{type:'text/plain;charset=utf-8'}), f.name.replace(/\.pdf$/i,'')+'_교정결과.txt','text/plain');
+  toast('결과 파일 다운로드 완료','success');
+}
+
+function removeFile(fid) {
+  const idx=files.findIndex(x=>x.id===fid); if(idx===-1)return;
+  files.splice(idx,1); activeId=null; renderFileList();
+  document.getElementById('detailPanel').classList.remove('visible');
+  document.getElementById('emptyState').style.display='';
+  updateTopbarMeta(); toast('파일이 제거되었습니다','info');
+}
+
+function updateTopbarMeta() {
+  const meta=document.getElementById('topbarMeta');
+  if(!files.length){meta.textContent='PDF 파일을 업로드하여 시작하세요';return;}
+  meta.textContent=files.length+'개 파일 · '+files.reduce((a,f)=>a+f.pageCount,0)+'페이지 · '+fmtSize(files.reduce((a,f)=>a+f.size,0));
+}
+</script>
+</body>
+</html>
