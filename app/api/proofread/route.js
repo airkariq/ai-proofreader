@@ -52,7 +52,7 @@ export async function POST(req) {
         model: 'google/gemini-2.0-flash-exp:free',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user',   content: `교정 강도: ${levelInstruction}\n\n교정할 텍스트:\n${text}` }
+          { role: 'user', content: `교정 강도: ${levelInstruction}\n\n교정할 텍스트:\n${text}` }
         ],
         temperature: 0.2,
       }),
@@ -74,14 +74,16 @@ export async function POST(req) {
       return Response.json({ error: '응답이 비어있습니다.' }, { status: 500 });
     }
 
-    // JSON 전처리
-    const cleaned = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+    const cleaned = rawText
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
 
     let result;
     try {
       result = JSON.parse(cleaned);
     } catch(e) {
-      console.error('JSON 파싱 실패:', cleaned);
       return Response.json({ error: 'JSON 파싱 실패', raw: cleaned }, { status: 500 });
     }
 
@@ -92,15 +94,6 @@ export async function POST(req) {
     });
 
   } catch(err) {
-    console.error('서버 오류:', err);
     return Response.json({ error: '서버 오류', detail: err.message }, { status: 500 });
   }
 }
-```
-
----
-
-**Vercel 환경변수 변경**
-```
-기존: GEMINI_API_KEY  → 삭제 또는 유지 (무관)
-추가: OPENROUTER_API_KEY = 발급받은 키
