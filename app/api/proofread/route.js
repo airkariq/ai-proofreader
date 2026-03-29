@@ -49,7 +49,7 @@ export async function POST(req) {
         'HTTP-Referer': 'https://ai-proofreader.vercel.app',
       },
       body: JSON.stringify({
-        model: 'nvidia/nemotron-3-super-120b-a12b:free',
+        model: 'stepfun/step-3.5-flash:free',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `교정 강도: ${levelInstruction}\n\n교정할 텍스트:\n${text}` }
