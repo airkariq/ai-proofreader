@@ -1,3 +1,5 @@
+export const maxDuration = 60; // 초 단위, Pro 플랜은 300까지 가능
+
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const LEVEL_PROMPT = {
