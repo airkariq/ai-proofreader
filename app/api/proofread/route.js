@@ -1,5 +1,6 @@
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+   'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+
 
 const LEVEL_PROMPT = {
   light: '맞춤법과 띄어쓰기만 교정하세요. 문장 구조는 절대 바꾸지 마세요.',
